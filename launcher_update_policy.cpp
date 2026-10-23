@@ -44,7 +44,7 @@ std::optional<Release> select_release(std::string_view json,std::string_view rep
             auto url=string(a,"browser_download_url"),digest=string(a,"digest");
             auto prefix="https://github.com/"+std::string(repo)+"/releases/download/"+tag+"/";
             if(url!=prefix+asset_name || !digest.starts_with("sha256:") || !hex_digest(std::string_view(digest).substr(7)))continue;
-            auto size=a.if_contains("size");if(!size || !size->is_int64() || size->as_int64()<=0 || size->as_int64()>64*1024*1024)continue;
+            auto size=a.if_contains("size");if(!size || !size->is_int64() || size->as_int64()<=0 || size->as_int64()>1536LL*1024*1024)continue;
             best=Release{tag,url,digest.substr(7),uint64_t(size->as_int64())};break;
         }
     }

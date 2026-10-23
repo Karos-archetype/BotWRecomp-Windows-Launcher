@@ -5,9 +5,9 @@
 #include <string_view>
 
 namespace launcher::updates {
-inline constexpr char version[]="0.1.0-preview.1";
+inline constexpr char version[]="0.2.0-preview.1";
 inline constexpr char repository[]="Karos-archetype/BotWRecomp-Windows-Launcher";
-inline constexpr char asset_name[]="BotWLauncher.exe";
+inline constexpr char asset_name[]="BotWRecomp-Windows-x64.zip";
 struct Release { std::string tag,url,sha256; uint64_t size{}; };
 bool valid_repository(std::string_view repo);
 bool newer(std::string_view candidate,std::string_view current);

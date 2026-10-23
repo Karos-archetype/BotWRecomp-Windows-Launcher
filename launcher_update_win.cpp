@@ -57,22 +57,25 @@ std::optional<Release> check_github(const std::string& repo,bool previews) {
 }
 std::filesystem::path stage(const Release& release,const std::filesystem::path& base) {
     // The metadata policy constrains URLs and hashes. Revalidate before using a cached result.
-    if(!release.url.starts_with("https://github.com/") || release.size==0 || release.size>64*1024*1024 || release.sha256.size()!=64)throw std::runtime_error("Invalid update metadata");
+    if(!release.url.starts_with("https://github.com/") || release.size==0 || release.size>1536ULL*1024*1024 || release.sha256.size()!=64)throw std::runtime_error("Invalid update metadata");
     auto parent=base/L".launcher-updates";std::filesystem::create_directories(parent);
     if(std::filesystem::is_symlink(std::filesystem::symlink_status(parent)))throw std::runtime_error("Update staging folder is a symbolic link");
     auto dir=parent/(std::to_wstring(GetCurrentProcessId())+L"-"+std::to_wstring(GetTickCount64()));
     if(!std::filesystem::create_directory(dir))throw std::runtime_error("Cannot create a unique update folder");
-    auto target=dir/L"BotWLauncher.exe";
+    auto target=dir/L"BotWRecomp-Windows-x64.zip";
     {std::ofstream out(target,std::ios::binary);if(!out)throw std::runtime_error("Launcher folder is not writable");fetch(release.url,release.size,out);out.flush();if(!out)throw std::runtime_error("Cannot finish writing the update");}
     if(std::filesystem::file_size(target)!=release.size || sha256(target)!=release.sha256)throw std::runtime_error("Update verification failed; the current launcher was not changed");
-    {std::ifstream in(target,std::ios::binary);char magic[2]{};in.read(magic,2);if(magic[0]!='M'||magic[1]!='Z')throw std::runtime_error("Downloaded asset is not a Windows executable");}
-    std::filesystem::copy_file(module(),dir/L"ApplyUpdate.exe");
+    {std::ifstream in(target,std::ios::binary);char magic[2]{};in.read(magic,2);if(magic[0]!='P'||magic[1]!='K')throw std::runtime_error("Downloaded asset is not a ZIP bundle");}
+    std::filesystem::copy(base/L"support/python",dir/L"python",std::filesystem::copy_options::recursive);
+    std::filesystem::copy_file(base/L"support/install_update.py",dir/L"install_update.py");
     {std::ofstream out(dir/L"sha256.txt",std::ios::binary);out<<release.sha256;if(!out)throw std::runtime_error("Cannot write update verification record");}
     return dir;
 }
 void launch_installer(const std::filesystem::path& staged,const std::filesystem::path& base) {
     if(std::filesystem::weakly_canonical(staged.parent_path())!=std::filesystem::weakly_canonical(base/L".launcher-updates"))throw std::runtime_error("Unexpected update folder");
-    if(!run(staged/L"ApplyUpdate.exe",L" --apply-launcher-update "+std::to_wstring(GetCurrentProcessId())))throw std::runtime_error("Cannot start the launcher updater");
+    std::ifstream record(staged/L"sha256.txt");std::string hash;record>>hash;
+    auto args=L" -I \""+(staged/L"install_update.py").wstring()+L"\" --archive \""+(staged/L"BotWRecomp-Windows-x64.zip").wstring()+L"\" --base \""+base.wstring()+L"\" --sha256 "+wide(hash)+L" --wait-pid "+std::to_wstring(GetCurrentProcessId());
+    if(!run(staged/L"python/python.exe",args))throw std::runtime_error("Cannot start the bundle updater");
 }
 int apply_if_requested() {
     int argc=0;auto argv=CommandLineToArgvW(GetCommandLineW(),&argc);if(!argv)throw std::runtime_error("Cannot read command line");

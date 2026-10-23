@@ -1,40 +1,56 @@
-# BotWRecomp Windows Launcher
+# BotWRecomp Windows — portable setup
 
-Experimental Windows x64 **launcher-only** pre-release, `v0.1.0-preview.1`.
+Experimental Windows x64 pre-release **v0.2.0-preview.1**. This replaces the old launcher-only package.
 
-This repository and its releases contain launcher code and the launcher executable only. They contain no ROM, RPX, recompiled guest/game executable, Nintendo game assets, game shaders, saves, keys, local configuration, or game downloads. The launcher cannot run the game on its own.
+Download **[BotWRecomp-Windows-x64.zip](https://github.com/Karos-archetype/BotWRecomp-Windows-Launcher/releases/download/v0.2.0-preview.1/BotWRecomp-Windows-x64.zip)** from [Releases](https://github.com/Karos-archetype/BotWRecomp-Windows-Launcher/releases). Extract the whole ZIP to a writable folder. No separate Python, compiler, Cemu installation or Vulkan SDK is needed.
+
+## First launch
+
+1. Open **BotWLauncher.exe**.
+2. Select your own extracted Wii U Breath of the Wild **base-game** and **USA v208 update** folders. Each contains `code/U-King.rpx` and `content/`. A merged, updated dump also works: select it as the base and leave Update blank.
+3. Choose your settings and click **Set up and Play**. The bundled tools prepare the game locally, then start it. This first preparation is substantial and can take many minutes; the launcher shows progress. Closing the launcher cancels preparation, and a later attempt reuses completed compilation work.
+
+After setup, open **Play Breath of the Wild.exe** for direct play with the settings last saved in the launcher. Keep that shortcut executable beside BotWLauncher.exe. You can right-click it and create a desktop shortcut. If setup is missing, direct play opens the launcher to finish it.
+
+Keep the entire extracted folder, including `support/`. Do not run the launcher from inside the ZIP. Old launcher-only users should extract this complete package into a new folder; copying just the new launcher is insufficient.
+
+## Bring your own game
+
+No game, update, DLC, keys, Nintendo assets, generated game code, shader caches or saves are included or downloaded. The package contains the host runtime, recompiler, compiler, Python runtime, AMD FSR dependency, source and notices. It builds the game component **on your computer from your dump**. The locally built game executable is not part of the release.
+
+This preview supports the USA v208 executable with SHA-256:
+
+```text
+ba58da5b95ce929e005d058ceb08b9b2788d1ab2bbc8a6c189bbadca0bb34d30
+```
+
+Other regions/revisions and encrypted WUD/WUX containers are not accepted by this setup. Use an extracted dump from your own Wii U. DLC is not part of this preview's setup.
+
+## Settings and saves
+
+- Display and internal resolution, window/fullscreen mode, VSync, sound volume/mute and game language (English, French, Spanish).
+- FPS caps: **30, 60, 90, Unlimited**. Higher caps are experimental, not performance guarantees; some cutscenes remain capped.
+- Bicubic, bilinear, FSR 1 and experimental **FSR 3.1 temporal upscaling**. FSR 3.1 includes animated-object vectors and separate gameplay HUD composition. Transparent effects and unsupported passes still use reactive rejection.
+- **DLSS and frame generation are not implemented.**
+
+Settings are saved in `windows-launch.ini` beside the launcher. New profiles store saves, caches and local preparation output in `%LOCALAPPDATA%/BotWRecomp/user`. Existing profiles keep their configured user-data location. Neither updating nor moving the portable package should require moving the game dump or deleting saves.
+
+Windows 10/11 x64, a compatible x64 CPU and a Vulkan-capable GPU with its current vendor driver are required. Allow at least 4 GB of free space for local preparation, in addition to your game files and the extracted package. This is an unsigned, experimental build. It has not been validated across the whole game or all hardware, and existing renderer issues remain.
+
+## Updates
+
+Configured launchers check this repository's releases; **Check for updates** also checks manually. Pre-releases are enabled by default. The updater downloads the complete ZIP, checks GitHub's SHA-256 digest, validates every packaged file and rejects unsafe archive paths. It closes the launcher, replaces managed package files, keeps a backup under `.launcher-updates/`, and reopens the launcher. `windows-launch.ini`, game dumps and save-data folders are preserved. Updated host components may require local preparation again; unchanged generated objects can be reused. First-run preparation itself works offline; release checks/downloads need Internet access.
 
 ## Credits and contributors
 
-Original project: [IshaanKalra2103/BotWRecomp](https://github.com/IshaanKalra2103/BotWRecomp), by Ishaan Kalra and the original BotWRecomp contributors. This Windows launcher work builds on that project's runtime interface. The original MIT notice is preserved in LICENSE and embedded in the executable. Boost.JSON uses the Boost Software License in BOOST-LICENSE.txt. Windows launcher additions are maintained here by Karos-archetype. Upstream authors are credited here; this does not imply their involvement in or endorsement of this separate release.
+Original project: **[IshaanKalra2103/BotWRecomp](https://github.com/IshaanKalra2103/BotWRecomp)**, Ishaan Kalra and the original contributors. Windows work is maintained by Karos-archetype. Original authors are credited for their work; this does not imply their participation in or endorsement of this release.
 
-AI-assisted development: [OpenAI Codex](https://openai.com/codex/) assisted with implementation, debugging, testing, and documentation under Karos-archetype’s direction.
+The Vulkan GPU layer derives from **[Cemu](https://github.com/cemu-project/Cemu)** (MPL-2.0). Other components include AMD FidelityFX FSR, SDL, glslang, libavc, Boost, fmt, GLM, zlib, Zstandard, Python and LLVM-MinGW. Notices are included in `licenses/`. The corresponding project source, including the modified MPL-covered files, is included in **Source.zip** inside the portable package and separately on the release.
 
-## Installation
+AI-assisted implementation, debugging, testing and documentation: **[OpenAI Codex](https://openai.com/codex/)**, under the maintainer's direction.
 
-Download `BotWLauncher.exe` from Releases and place it beside an existing compatible Windows native runtime named `BotWWindowsHeadless.exe`. That runtime is **not distributed here**. Keep your existing `windows-launch.ini` if you already use this Windows port. Select your own base-game and update folders. New installations default the user-data folder to `%LOCALAPPDATA%/BotWRecomp/user`; the runtime must support this launcher's settings interface. No game data is downloaded by the launcher.
+Unofficial project; not affiliated with Nintendo. Breath of the Wild and related marks belong to their respective owners.
 
-## Settings
+## Source and development
 
-- Display mode, window and internal render resolutions, VSync, volume/mute, and cached-effect preparation.
-- FPS limits: 30, 60, 90, Unlimited. High caps remain experimental and are not performance guarantees.
-- Game language: English, Français, Español for USA game data. The matching updated runtime must read `language=1`, `3`, or `4` from windows-launch.ini and return it through `cafe.language`. Updating this launcher alone cannot add language support to an older runtime. The local development runtime has been updated separately; no runtime patch or game executable is shipped in this release.
-- FSR 1 spatial upscaling remains available. **FSR 3.1 is displayed as unavailable**, and selecting it explains the missing gameplay integration. It is not enabled by this release. DLSS and frame generation are not implemented.
-
-## GitHub launcher updates
-
-The launcher checks this repository's public release list at startup; `Check for updates` checks again. `Include pre-releases` defaults on for this preview channel. A newer compatible release enables `Update to <version>`. The updater downloads only the exact `BotWLauncher.exe` asset from the configured repository, checks its size and GitHub's SHA-256 digest, waits for the current launcher to close, and replaces only that executable. `BotWLauncher.previous.exe` preserves the prior launcher. Settings, game files, the runtime and saves are not updated. Internet access is required for release checks; GitHub rate limits and download failures leave the current launcher in place. This is an unsigned experimental binary.
-
-Maintainers: use increasing tags such as `v0.1.0-preview.2`, `v0.1.0-rc.1`, or `v0.1.0`; keep the embedded version in launcher_update.h in sync. Attach `BotWLauncher.exe` directly to the release. A ZIP-only release or a missing SHA-256 digest will not enable automatic updates. The updater supports alpha, beta, preview and rc versions with a numeric suffix. Only the first 100 releases are checked.
-
-## Build the launcher without game files
-
-Use CMake 3.24+, Ninja, a 64-bit LLVM-MinGW compiler, and Boost headers (tested with Boost 1.86). No Vulkan SDK, generated game source, ROM, or RPX is needed for this launcher build.
-
-```powershell
-cmake -S . -B build -G Ninja -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DBOOST_ROOT=C:/path/to/boost_1_86_0 -DCMAKE_BUILD_TYPE=Release
-cmake --build build --target BotWLauncher launcher_settings_tests launcher_update_tests
-ctest --test-dir build --output-on-failure
-```
-
-The settings and release-policy tests cover language persistence, invalid settings, pre-release/version ordering, drafts, malformed metadata, repository/asset URL pinning and required SHA-256 digests. The actual update helper was also exercised against a private replacement executable: it waited for the old process, retained a backup, launched the replacement, and preserved settings/save sentinels. Longer gameplay testing remains outside this launcher-only release.
+The repository root contains the launcher, direct-play helper, offline preparation and package updater sources. They can be built without game data using CMake 3.24+, LLVM-MinGW and Boost headers. The full port source and build files are in Source.zip. Generating or building the game component requires your own supported dump; no generated game source or object files are distributed.

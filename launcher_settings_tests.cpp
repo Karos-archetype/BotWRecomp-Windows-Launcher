@@ -5,6 +5,10 @@ int main(){try{
     {std::ofstream f(path);f<<"game=C:/game with spaces\nupdate=C:/update\nuser=C:/private saves\nseconds=0\ndiagnostics=1\n";}
     auto s=launcher::load(path);if(s.fps!=30 || s.mute || s.game!="C:/game with spaces")throw std::runtime_error("Defaults/paths");
     for(auto cap:{30,60,90,0}){s.fps=cap;s.upscaler="fsr1";s.volume=35;s.width=1920;s.height=1080;s.scale=.75f;s.fullscreen=true;launcher::save(path,s);auto r=launcher::load(path);if(r.fps!=cap || r.upscaler!="fsr1" || r.scale!=.75f || r.volume!=35 || !r.fullscreen || launcher::read(path)["diagnostics"]!="1")throw std::runtime_error("Settings round trip/preserved config");}
+    s.upscaler="fsr31";s.scale=.75f;launcher::save(path,s);
+    if(launcher::load(path).upscaler!="fsr31")throw std::runtime_error("FSR 3.1 persistence");
+    {auto bad=s;bad.scale=3;bool failed=false;try{bad.validate();}catch(...){failed=true;}if(!failed)throw std::runtime_error("FSR downscaling must be rejected");}
+    s.upscaler="fsr1";
     unsigned rejected=0;
     if(!launcher::Settings{}.prewarm)throw std::runtime_error("Effect preparation must default on");
     for(bool warm:{false,true}){s.prewarm=warm;launcher::save(path,s);if(launcher::load(path).prewarm!=warm)throw std::runtime_error("Effect preparation persistence");}

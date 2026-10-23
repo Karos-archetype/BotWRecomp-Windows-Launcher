@@ -4,3 +4,5 @@ build/
 windows-launch.ini
 .launcher-updates/
 Launcher-CREDITS.txt
+portable-installer-test-temp/
+__pycache__/

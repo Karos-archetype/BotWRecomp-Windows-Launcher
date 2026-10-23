@@ -23,7 +23,8 @@ struct Settings {
         if(!(scale>=0.5f && scale<=3.f))throw std::runtime_error("Render scale must be 0.5 to 3.0");
         if(volume<0 || volume>100)throw std::runtime_error("Volume must be 0 to 100");
         if(language!=1 && language!=3 && language!=4)throw std::runtime_error("Game language must be English, French or Spanish for this USA build");
-        if(upscaler!="bicubic" && upscaler!="linear" && upscaler!="fsr1")throw std::runtime_error("Unsupported upscaler; DLSS is unavailable in this build");
+        if(upscaler!="bicubic" && upscaler!="linear" && upscaler!="fsr1" && upscaler!="fsr31")throw std::runtime_error("Unsupported upscaler; DLSS is unavailable in this build");
+        if(upscaler=="fsr31" && (1280.f*scale>width || 720.f*scale>height))throw std::runtime_error("FSR 3.1 needs an internal render resolution at or below the window resolution");
     }
 };
 inline std::map<std::string,std::string> read(const std::filesystem::path& path) {

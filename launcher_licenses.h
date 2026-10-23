@@ -4,6 +4,12 @@ namespace launcher { inline constexpr char license_text[] = R"LICENSE(Credits
 Original project: https://github.com/IshaanKalra2103/BotWRecomp
 Original author: Ishaan Kalra and the BotWRecomp contributors.
 Windows launcher additions: Karos-archetype.
+AI-assisted implementation, debugging and documentation: OpenAI Codex,
+under the maintainer's direction.
+Vulkan GPU layer: Cemu contributors (MPL-2.0). Temporal upscaling: AMD FSR.
+The portable package includes full dependency notices in licenses/ and
+corresponding project source in Source.zip. No game executable is distributed;
+the game component is generated locally from the user's supported dump.
 This launcher is an independent experimental project, not an official Nintendo product.
 
 MIT License

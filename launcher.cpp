@@ -103,6 +103,11 @@ void launch_saved(){
     auto game_root=std::filesystem::u8path(settings.game),update_root=std::filesystem::u8path(settings.update);
     if(!std::filesystem::exists(game_root/L"code/U-King.rpx"))throw std::runtime_error("Select the base game folder containing code/U-King.rpx.");
     if(!settings.update.empty() && !std::filesystem::exists(update_root/L"code/U-King.rpx"))throw std::runtime_error("Select the update folder containing code/U-King.rpx.");
+    if(std::filesystem::exists(base/L"support/runtime-id.txt")){
+        auto effective=settings.update.empty()?game_root:update_root;
+        if(!std::filesystem::is_directory(game_root/L"content")||!std::filesystem::is_directory(effective/L"content"))throw std::runtime_error("Choose extracted dump folders containing code/ and content/.");
+        if(launcher::updates::sha256(effective/L"code/U-King.rpx")!="ba58da5b95ce929e005d058ceb08b9b2788d1ab2bbc8a6c189bbadca0bb34d30")throw std::runtime_error("This preview requires your own Wii U USA v208 update. The selected executable is unsupported.");
+    }
     if(settings.user.empty())throw std::runtime_error("The save-data folder is missing from windows-launch.ini.");
     launcher::save(config,settings);auto exe=prepared_runtime();
     if(!std::filesystem::exists(exe))throw std::runtime_error("The native game executable was not found beside the launcher.");

@@ -8,6 +8,8 @@ This repository and its releases contain launcher code and the launcher executab
 
 Original project: [IshaanKalra2103/BotWRecomp](https://github.com/IshaanKalra2103/BotWRecomp), by Ishaan Kalra and the original BotWRecomp contributors. This Windows launcher work builds on that project's runtime interface. The original MIT notice is preserved in LICENSE and embedded in the executable. Boost.JSON uses the Boost Software License in BOOST-LICENSE.txt. Windows launcher additions are maintained here by Karos-archetype. Upstream authors are credited here; this does not imply their involvement in or endorsement of this separate release.
 
+AI-assisted development: [OpenAI Codex](https://openai.com/codex/) assisted with implementation, debugging, testing, and documentation under Karos-archetypeâ€™s direction.
+
 ## Installation
 
 Download `BotWLauncher.exe` from Releases and place it beside an existing compatible Windows native runtime named `BotWWindowsHeadless.exe`. That runtime is **not distributed here**. Keep your existing `windows-launch.ini` if you already use this Windows port. Select your own base-game and update folders. New installations default the user-data folder to `%LOCALAPPDATA%/BotWRecomp/user`; the runtime must support this launcher's settings interface. No game data is downloaded by the launcher.
@@ -16,7 +18,7 @@ Download `BotWLauncher.exe` from Releases and place it beside an existing compat
 
 - Display mode, window and internal render resolutions, VSync, volume/mute, and cached-effect preparation.
 - FPS limits: 30, 60, 90, Unlimited. High caps remain experimental and are not performance guarantees.
-- Game language: English, Français, Español for USA game data. The matching updated runtime must read `language=1`, `3`, or `4` from windows-launch.ini and return it through `cafe.language`. Updating this launcher alone cannot add language support to an older runtime. The local development runtime has been updated separately; no runtime patch or game executable is shipped in this release.
+- Game language: English, FranÃ§ais, EspaÃ±ol for USA game data. The matching updated runtime must read `language=1`, `3`, or `4` from windows-launch.ini and return it through `cafe.language`. Updating this launcher alone cannot add language support to an older runtime. The local development runtime has been updated separately; no runtime patch or game executable is shipped in this release.
 - FSR 1 spatial upscaling remains available. **FSR 3.1 is displayed as unavailable**, and selecting it explains the missing gameplay integration. It is not enabled by this release. DLSS and frame generation are not implemented.
 
 ## GitHub launcher updates

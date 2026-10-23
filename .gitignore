@@ -1,0 +1,6 @@
+build/
+*.exe
+*.obj
+windows-launch.ini
+.launcher-updates/
+Launcher-CREDITS.txt

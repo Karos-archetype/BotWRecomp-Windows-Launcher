@@ -1,8 +1,8 @@
 # BotWRecomp Windows — portable setup
 
-Experimental Windows x64 pre-release **v0.2.0-preview.1**. This replaces the old launcher-only package.
+Experimental Windows x64 pre-release **v0.2.0-preview.2**. The launcher supports resizing, maximizing and fullscreen (F11; Escape to leave fullscreen).
 
-Download **[BotWRecomp-Windows-x64.zip](https://github.com/Karos-archetype/BotWRecomp-Windows-Launcher/releases/download/v0.2.0-preview.1/BotWRecomp-Windows-x64.zip)** from [Releases](https://github.com/Karos-archetype/BotWRecomp-Windows-Launcher/releases). Extract the whole ZIP to a writable folder. No separate Python, compiler, Cemu installation or Vulkan SDK is needed.
+Download **[BotWRecomp-Windows-x64.zip](https://github.com/Karos-archetype/BotWRecomp-Windows-Launcher/releases/download/v0.2.0-preview.2/BotWRecomp-Windows-x64.zip)** from [Releases](https://github.com/Karos-archetype/BotWRecomp-Windows-Launcher/releases). Extract the whole ZIP to a writable folder. No separate Python, compiler, Cemu installation or Vulkan SDK is needed.
 
 ## First launch
 

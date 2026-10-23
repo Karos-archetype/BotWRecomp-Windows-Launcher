@@ -24,13 +24,17 @@
 
 namespace {
 constexpr COLORREF bg=RGB(13,22,26),panel=RGB(22,34,38),field=RGB(29,44,48),gold=RGB(214,190,133),ink=RGB(228,234,229),dim=RGB(150,169,166);
-enum { RES=100,MODE,FPS,UPSCALE,RENDER,VOLUME,MUTE,VSYNC,GAME,UPDATE,BROWSE_GAME,BROWSE_UPDATE,PLAY,SAVE,LOGS,PREWARM,LANGUAGE,RELEASE_REPO,PRERELEASES,CHECK_RELEASE,APPLY_RELEASE,CREDITS };
+enum { RES=100,MODE,FPS,UPSCALE,RENDER,VOLUME,MUTE,VSYNC,GAME,UPDATE,BROWSE_GAME,BROWSE_UPDATE,PLAY,SAVE,LOGS,PREWARM,LANGUAGE,RELEASE_REPO,PRERELEASES,CHECK_RELEASE,APPLY_RELEASE,CREDITS,FULLSCREEN };
 HWND root{},status{},volume_text{};std::array<HWND,120> controls{};
 HANDLE preparation_process{},preparation_job{};bool direct_play=false;
 HFONT font{},small{},heading{},title{},brand{};HBRUSH background{},fields{};
 launcher::Settings settings;std::filesystem::path base,config;
 std::wstring gpu=L"GPU information unavailable";unsigned vendor{};HANDLE game_process{};
-float dpi=1.f;
+float dpi=1.f;int origin_x=0,origin_y=0;
+bool launcher_fullscreen=false;WINDOWPLACEMENT windowed_placement{sizeof(WINDOWPLACEMENT)};
+constexpr DWORD windowed_style=WS_OVERLAPPEDWINDOW|WS_CLIPCHILDREN;
+struct LayoutItem {HWND window;int x,y,w,h;bool small_font=false;};
+std::vector<LayoutItem> layout_items;
 constexpr UINT update_result_message=WM_APP+1,initial_check_message=WM_APP+2;
 struct UpdateResult {std::optional<launcher::updates::Release> release;std::filesystem::path staged;std::string error,repo;bool install=false;};
 std::thread update_worker;bool update_busy=false;
@@ -39,11 +43,11 @@ int px(int x){return int(x*dpi);}
 std::wstring wide(const std::string& s){if(s.empty())return {};int n=MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,s.data(),s.size(),nullptr,0);if(!n)throw std::runtime_error("Invalid UTF-8 in settings");std::wstring out(n,0);MultiByteToWideChar(CP_UTF8,0,s.data(),s.size(),out.data(),n);return out;}
 std::string utf8(const std::wstring& s){if(s.empty())return {};int n=WideCharToMultiByte(CP_UTF8,0,s.data(),s.size(),nullptr,0,nullptr,nullptr);std::string out(n,0);WideCharToMultiByte(CP_UTF8,0,s.data(),s.size(),out.data(),n,nullptr,nullptr);return out;}
 HFONT make_font(int size,int weight,const wchar_t* face=L"Segoe UI"){return CreateFontW(-px(size),0,0,0,weight,FALSE,FALSE,FALSE,DEFAULT_CHARSET,OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,CLEARTYPE_QUALITY,DEFAULT_PITCH,face);}
-void text(HDC dc,const wchar_t* s,int x,int y,int w,int h,HFONT f,COLORREF color,UINT flags=DT_LEFT|DT_WORDBREAK){SelectObject(dc,f);SetTextColor(dc,color);SetBkMode(dc,TRANSPARENT);RECT r{px(x),px(y),px(x+w),px(y+h)};DrawTextW(dc,s,-1,&r,flags);}
-void rect(HDC dc,int x,int y,int w,int h,COLORREF color){RECT r{px(x),px(y),px(x+w),px(y+h)};auto b=CreateSolidBrush(color);FillRect(dc,&r,b);DeleteObject(b);}
-HWND widget(int id,const wchar_t* cls,const wchar_t* value,int x,int y,int w,int h,DWORD style=0){auto handle=CreateWindowExW(0,cls,value,WS_CHILD|WS_VISIBLE|WS_TABSTOP|style,px(x),px(y),px(w),px(h),root,reinterpret_cast<HMENU>(INT_PTR(id)),GetModuleHandleW(nullptr),nullptr);SendMessageW(handle,WM_SETFONT,reinterpret_cast<WPARAM>(font),TRUE);if(id>=100)controls[id-100]=handle;return handle;}
+void text(HDC dc,const wchar_t* s,int x,int y,int w,int h,HFONT f,COLORREF color,UINT flags=DT_LEFT|DT_WORDBREAK){SelectObject(dc,f);SetTextColor(dc,color);SetBkMode(dc,TRANSPARENT);RECT r{origin_x+px(x),origin_y+px(y),origin_x+px(x+w),origin_y+px(y+h)};DrawTextW(dc,s,-1,&r,flags);}
+void rect(HDC dc,int x,int y,int w,int h,COLORREF color){RECT r{origin_x+px(x),origin_y+px(y),origin_x+px(x+w),origin_y+px(y+h)};auto b=CreateSolidBrush(color);FillRect(dc,&r,b);DeleteObject(b);}
+HWND widget(int id,const wchar_t* cls,const wchar_t* value,int x,int y,int w,int h,DWORD style=0){auto handle=CreateWindowExW(0,cls,value,WS_CHILD|WS_VISIBLE|WS_TABSTOP|style,px(x),px(y),px(w),px(h),root,reinterpret_cast<HMENU>(INT_PTR(id)),GetModuleHandleW(nullptr),nullptr);SendMessageW(handle,WM_SETFONT,reinterpret_cast<WPARAM>(font),TRUE);layout_items.push_back({handle,x,y,w,h});if(id>=100)controls[id-100]=handle;return handle;}
 HWND control(int id){return controls[id-100];}
-void label(const wchar_t* value,int x,int y,int w=300){auto h=CreateWindowExW(0,L"STATIC",value,WS_CHILD|WS_VISIBLE,px(x),px(y),px(w),px(22),root,nullptr,nullptr,nullptr);SendMessageW(h,WM_SETFONT,reinterpret_cast<WPARAM>(small),TRUE);}
+void label(const wchar_t* value,int x,int y,int w=300){auto h=CreateWindowExW(0,L"STATIC",value,WS_CHILD|WS_VISIBLE,px(x),px(y),px(w),px(22),root,nullptr,nullptr,nullptr);SendMessageW(h,WM_SETFONT,reinterpret_cast<WPARAM>(small),TRUE);layout_items.push_back({h,x,y,w,22,true});}
 void combo(int id,int x,int y,int w,std::initializer_list<const wchar_t*> items,int chosen){auto h=widget(id,L"COMBOBOX",L"",x,y,w,260,CBS_DROPDOWNLIST|WS_VSCROLL);for(auto item:items)SendMessageW(h,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(item));SendMessageW(h,CB_SETCURSEL,chosen,0);}
 int selected(int id){return int(SendMessageW(control(id),CB_GETCURSEL,0,0));}
 std::wstring value(int id){int n=GetWindowTextLengthW(control(id));std::wstring s(n+1,0);GetWindowTextW(control(id),s.data(),n+1);s.resize(n);return s;}
@@ -140,22 +144,54 @@ void play(){
     notice(L"First-time preparation started. Closing the launcher cancels it; progress is saved for next time.");
 }
 void paint(){PAINTSTRUCT ps{};HDC dc=BeginPaint(root,&ps);RECT area{};GetClientRect(root,&area);FillRect(dc,&area,background);
-    rect(dc,0,0,310,780,panel);rect(dc,28,52,40,3,gold);
+    rect(dc,0,0,310,790,panel);rect(dc,28,52,40,3,gold);
     text(dc,L"THE LEGEND OF",29,85,255,28,small,gold);
     text(dc,L"ZELDA",24,112,275,75,brand,gold);
     text(dc,L"BREATH OF THE WILD",29,188,260,30,font,ink);
     text(dc,L"NATIVE WINDOWS",30,224,260,25,small,dim);
     rect(dc,29,355,252,1,RGB(54,76,77));text(dc,L"GRAPHICS DEVICE",29,372,260,25,small,gold);text(dc,gpu.c_str(),29,403,250,52,font,ink);
     text(dc,(L"Launcher v"+wide(launcher::updates::version)).c_str(),29,480,260,25,small,dim);
-    text(dc,L"Launch settings",350,40,650,46,title,ink);text(dc,L"Graphics, performance and audio",352,88,650,28,font,dim);
+    text(dc,L"Launch settings",350,40,450,46,title,ink);text(dc,L"Graphics, performance and audio",352,88,650,28,font,dim);
     text(dc,vendor==0x10de?L"DLSS unavailable: temporal renderer integration is not implemented in this build.":L"DLSS unavailable on this GPU. NVIDIA RTX and temporal renderer integration are required.",352,451,650,37,small,dim);
     text(dc,L"90 FPS and Unlimited are experimental. Some cutscenes retain a 30 FPS limit.",352,628,650,40,small,dim);
     if(selected(UPSCALE)==3)text(dc,L"FSR 3.1: object motion + separate HUD. Effects may shimmer. No frame generation.",352,652,650,26,small,dim);
     EndPaint(root,&ps);
 }
-void create_controls(){
+void rebuild_fonts(){
+    auto old=std::array{font,small,heading,title,brand};
     font=make_font(16,FW_NORMAL);small=make_font(13,FW_NORMAL);heading=make_font(19,FW_SEMIBOLD);title=make_font(30,FW_SEMIBOLD);brand=make_font(62,FW_BOLD,L"Georgia");
+    for(auto& item:layout_items)SendMessageW(item.window,WM_SETFONT,reinterpret_cast<WPARAM>(item.small_font?small:font),FALSE);
+    for(auto f:old)if(f)DeleteObject(f);
+}
+void resize_layout(){
+    if(layout_items.empty())return;
+    RECT client{};GetClientRect(root,&client);if(!client.right||!client.bottom)return;
+    float scale=std::min(client.right/1040.f,client.bottom/790.f);
+    bool changed=std::abs(scale-dpi)>.001f;dpi=scale;
+    origin_x=(client.right-px(1040))/2;origin_y=(client.bottom-px(790))/2;
+    if(changed)rebuild_fonts();
+    for(auto& item:layout_items)SetWindowPos(item.window,nullptr,origin_x+px(item.x),origin_y+px(item.y),px(item.w),px(item.h),SWP_NOZORDER|SWP_NOACTIVATE);
+    RedrawWindow(root,nullptr,nullptr,RDW_INVALIDATE|RDW_ALLCHILDREN);
+}
+void toggle_fullscreen(){
+    if(!launcher_fullscreen){
+        windowed_placement.length=sizeof(windowed_placement);GetWindowPlacement(root,&windowed_placement);
+        MONITORINFO monitor{sizeof(monitor)};
+        if(!GetMonitorInfoW(MonitorFromWindow(root,MONITOR_DEFAULTTONEAREST),&monitor))return;
+        launcher_fullscreen=true;SetWindowLongPtrW(root,GWL_STYLE,WS_POPUP|WS_VISIBLE|WS_CLIPCHILDREN);
+        SetWindowPos(root,HWND_TOP,monitor.rcMonitor.left,monitor.rcMonitor.top,monitor.rcMonitor.right-monitor.rcMonitor.left,monitor.rcMonitor.bottom-monitor.rcMonitor.top,SWP_FRAMECHANGED|SWP_NOOWNERZORDER);
+    }else{
+        launcher_fullscreen=false;SetWindowLongPtrW(root,GWL_STYLE,windowed_style|WS_VISIBLE);
+        SetWindowPlacement(root,&windowed_placement);
+        SetWindowPos(root,nullptr,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOZORDER|SWP_NOACTIVATE|SWP_FRAMECHANGED);
+    }
+    SetWindowTextW(control(FULLSCREEN),launcher_fullscreen?L"Exit fullscreen (F11)":L"Fullscreen (F11)");
+    resize_layout();
+}
+void create_controls(){
+    rebuild_fonts();
     background=CreateSolidBrush(bg);fields=CreateSolidBrush(field);
+    widget(FULLSCREEN,L"BUTTON",L"Fullscreen (F11)",810,46,188,34,BS_OWNERDRAW);
     label(L"WINDOW RESOLUTION",352,132);
     int ri=settings.width==1600?1:settings.width==1920?2:settings.width==2560?3:settings.width==3840?4:0;
     combo(RES,350,158,310,{L"1280 × 720",L"1600 × 900",L"1920 × 1080",L"2560 × 1440",L"3840 × 2160"},ri);
@@ -182,7 +218,7 @@ void create_controls(){
     label(L"BASE GAME FOLDER",352,497,500);widget(GAME,L"EDIT",wide(settings.game).c_str(),350,522,548,29,ES_AUTOHSCROLL|WS_BORDER);widget(BROWSE_GAME,L"BUTTON",L"Browse",912,520,86,32,BS_OWNERDRAW);
     label(L"UPDATE FOLDER",352,560,500);widget(UPDATE,L"EDIT",wide(settings.update).c_str(),350,585,548,29,ES_AUTOHSCROLL|WS_BORDER);widget(BROWSE_UPDATE,L"BUTTON",L"Browse",912,583,86,32,BS_OWNERDRAW);
     widget(PLAY,L"BUTTON",std::filesystem::exists(prepared_runtime())?L"PLAY GAME":L"SET UP AND PLAY",350,685,224,50,BS_OWNERDRAW);widget(SAVE,L"BUTTON",L"Save settings",592,685,192,50,BS_OWNERDRAW);widget(LOGS,L"BUTTON",L"Open logs",802,685,196,50,BS_OWNERDRAW);
-    status=widget(0,L"STATIC",settings.game.empty()?L"First run: choose your dumped game + USA v208 update, then click Set up and Play.":L"Ready to play.",352,746,650,24);SendMessageW(status,WM_SETFONT,reinterpret_cast<WPARAM>(small),TRUE);
+    status=widget(0,L"STATIC",settings.game.empty()?L"First run: choose your dumped game + USA v208 update, then click Set up and Play.":L"Ready to play.",352,746,650,24);SendMessageW(status,WM_SETFONT,reinterpret_cast<WPARAM>(small),TRUE);layout_items.back().small_font=true;
 }
 LRESULT CALLBACK proc(HWND w,UINT msg,WPARAM wp,LPARAM lp){
     switch(msg){
@@ -193,13 +229,16 @@ LRESULT CALLBACK proc(HWND w,UINT msg,WPARAM wp,LPARAM lp){
         else if(result->install){try{launcher::updates::launch_installer(result->staged,base);DestroyWindow(w);return 0;}catch(const std::exception& e){notice(wide(e.what()));}}
         else {available_release=result->release;checked_repo=result->repo;SetWindowTextW(control(APPLY_RELEASE),available_release?(L"Update to "+wide(available_release->tag)).c_str():L"Update package");notice(available_release?L"A package update is available. Your settings and saves will be preserved.":L"No newer compatible portable release found.");}
         update_controls();return 0;}
+    case WM_SIZE:if(wp!=SIZE_MINIMIZED)resize_layout();return 0;
+    case WM_GETMINMAXINFO:if(!launcher_fullscreen){auto limits=reinterpret_cast<MINMAXINFO*>(lp);UINT window_dpi=GetDpiForWindow(w);if(!window_dpi)window_dpi=96;RECT minimum{0,0,MulDiv(780,window_dpi,96),MulDiv(593,window_dpi,96)};AdjustWindowRectExForDpi(&minimum,windowed_style,FALSE,0,window_dpi);limits->ptMinTrackSize={minimum.right-minimum.left,minimum.bottom-minimum.top};}return 0;
+    case WM_DPICHANGED:{auto suggested=reinterpret_cast<RECT*>(lp);if(!launcher_fullscreen)SetWindowPos(w,nullptr,suggested->left,suggested->top,suggested->right-suggested->left,suggested->bottom-suggested->top,SWP_NOZORDER|SWP_NOACTIVATE);resize_layout();return 0;}
     case WM_CLOSE:if(update_busy){notice(L"Wait for the update operation to finish before closing.");return 0;}DestroyWindow(w);return 0;
     case WM_ERASEBKGND:return 1;
     case WM_PAINT:paint();return 0;
     case WM_CTLCOLORSTATIC:case WM_CTLCOLOREDIT:case WM_CTLCOLORLISTBOX:case WM_CTLCOLORBTN:{auto dc=reinterpret_cast<HDC>(wp);SetTextColor(dc,ink);SetBkColor(dc,msg==WM_CTLCOLOREDIT || msg==WM_CTLCOLORLISTBOX?field:bg);return reinterpret_cast<LRESULT>(msg==WM_CTLCOLOREDIT || msg==WM_CTLCOLORLISTBOX?fields:background);}
     case WM_HSCROLL:SetWindowTextW(volume_text,(std::to_wstring(SendMessageW(control(VOLUME),TBM_GETPOS,0,0))+L"%").c_str());return 0;
     case WM_DRAWITEM:{auto d=reinterpret_cast<DRAWITEMSTRUCT*>(lp);bool primary=d->CtlID==PLAY;auto b=CreateSolidBrush(primary?gold:field);FillRect(d->hDC,&d->rcItem,b);DeleteObject(b);SetBkMode(d->hDC,TRANSPARENT);SetTextColor(d->hDC,(d->itemState&ODS_DISABLED)?dim:primary?bg:ink);SelectObject(d->hDC,font);auto s=value(d->CtlID);DrawTextW(d->hDC,s.c_str(),-1,&d->rcItem,DT_CENTER|DT_VCENTER|DT_SINGLELINE);if(d->itemState&ODS_FOCUS)DrawFocusRect(d->hDC,&d->rcItem);return TRUE;}
-    case WM_COMMAND:try {int id=LOWORD(wp);if(id==FPS && HIWORD(wp)==CBN_SELCHANGE)update_limits();if((id==UPSCALE || id==RES) && HIWORD(wp)==CBN_SELCHANGE)update_upscaling();if(HIWORD(wp)==BN_CLICKED){if(id==PLAY)play();else if(id==SAVE)save();else if(id==CHECK_RELEASE)start_update(false);else if(id==APPLY_RELEASE)start_update(true);else if(id==CREDITS)show_credits();else if(id==BROWSE_GAME)browse(GAME);else if(id==BROWSE_UPDATE)browse(UPDATE);else if(id==LOGS && !settings.user.empty())ShellExecuteW(w,L"open",std::filesystem::u8path(settings.user).c_str(),nullptr,nullptr,SW_SHOWNORMAL);}}catch(const std::exception& e){notice(wide(e.what()));MessageBoxW(w,wide(e.what()).c_str(),L"BOTW Launcher",MB_OK|MB_ICONERROR);}return 0;
+    case WM_COMMAND:try {int id=LOWORD(wp);if(id==FPS && HIWORD(wp)==CBN_SELCHANGE)update_limits();if((id==UPSCALE || id==RES) && HIWORD(wp)==CBN_SELCHANGE)update_upscaling();if(HIWORD(wp)==BN_CLICKED){if(id==FULLSCREEN)toggle_fullscreen();else if(id==PLAY)play();else if(id==SAVE)save();else if(id==CHECK_RELEASE)start_update(false);else if(id==APPLY_RELEASE)start_update(true);else if(id==CREDITS)show_credits();else if(id==BROWSE_GAME)browse(GAME);else if(id==BROWSE_UPDATE)browse(UPDATE);else if(id==LOGS && !settings.user.empty())ShellExecuteW(w,L"open",std::filesystem::u8path(settings.user).c_str(),nullptr,nullptr,SW_SHOWNORMAL);}}catch(const std::exception& e){notice(wide(e.what()));MessageBoxW(w,wide(e.what()).c_str(),L"BOTW Launcher",MB_OK|MB_ICONERROR);}return 0;
     case WM_TIMER:
         if(preparation_process){
             std::ifstream in(std::filesystem::u8path(settings.user)/L"preparation-status.txt");std::string message;std::getline(in,message);if(!message.empty())notice(wide(message));
@@ -223,9 +262,11 @@ int WINAPI wWinMain(HINSTANCE instance,HINSTANCE,PWSTR,int show){try{
     int argc{};auto arguments=CommandLineToArgvW(GetCommandLineW(),&argc);if(arguments){direct_play=argc==2&&std::wstring_view(arguments[1])==L"--play";LocalFree(arguments);}
     if(direct_play&&!settings.game.empty()&&std::filesystem::exists(prepared_runtime())){launch_saved();CloseHandle(game_process);game_process=nullptr;CoUninitialize();return 0;}
     WNDCLASSEXW wc{sizeof(wc)};wc.hInstance=instance;wc.lpfnWndProc=proc;wc.lpszClassName=L"BotWNativeLauncher";wc.hCursor=LoadCursorW(nullptr,IDC_ARROW);wc.hIcon=LoadIconW(nullptr,IDI_APPLICATION);RegisterClassExW(&wc);
-    RECT size{0,0,px(1040),px(790)};AdjustWindowRectEx(&size,WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX,FALSE,0);
-    root=CreateWindowExW(0,wc.lpszClassName,L"Breath of the Wild · Native Launcher",WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX,CW_USEDEFAULT,CW_USEDEFAULT,size.right-size.left,size.bottom-size.top,nullptr,nullptr,instance,nullptr);
+    RECT size{0,0,px(1040),px(790)};AdjustWindowRectEx(&size,windowed_style,FALSE,0);
+    root=CreateWindowExW(0,wc.lpszClassName,L"Breath of the Wild · Native Launcher",windowed_style,CW_USEDEFAULT,CW_USEDEFAULT,size.right-size.left,size.bottom-size.top,nullptr,nullptr,instance,nullptr);
     BOOL dark=TRUE;DwmSetWindowAttribute(root,20,&dark,sizeof(dark));ShowWindow(root,show);UpdateWindow(root);
-    MSG message{};while(GetMessageW(&message,nullptr,0,0)>0){if(!IsDialogMessageW(root,&message)){TranslateMessage(&message);DispatchMessageW(&message);}}
+    MSG message{};while(GetMessageW(&message,nullptr,0,0)>0){
+        if(message.message==WM_KEYDOWN&&(message.wParam==VK_F11||(message.wParam==VK_ESCAPE&&launcher_fullscreen))){if(!(message.lParam&(1LL<<30)))toggle_fullscreen();continue;}
+        if(!IsDialogMessageW(root,&message)){TranslateMessage(&message);DispatchMessageW(&message);}}
     if(update_worker.joinable())update_worker.join();CoUninitialize();return 0;
 }catch(const std::exception& e){MessageBoxW(nullptr,wide(e.what()).c_str(),L"BOTW Launcher",MB_ICONERROR);return 1;}}

@@ -17,7 +17,7 @@ int main(){try{
     for(auto field:{std::string("\"digest\""),std::string("\"name\""),std::string("\"state\"")}){changed=data;changed.replace(changed.find(field),field.size(),"\"unexpected\"");CHECK(!select_release(changed,"test/launcher",true));}
     changed=data;changed.replace(changed.find("\"draft\":false"),13,"\"draft\":true");CHECK(!select_release(changed,"test/launcher",true));
     CHECK(!select_release("[]","test/launcher",true));
-    CHECK(select_release("["+release("v0.2.0-preview.3")+","+release("v0.2.0-preview.2")+"]","test/launcher",true)->tag=="v0.2.0-preview.3");
+    CHECK(select_release("["+release("v0.2.0-preview.4")+","+release("v0.2.0-preview.3")+"]","test/launcher",true)->tag=="v0.2.0-preview.4");
     changed="["+release("v0.3.0")+"]";auto p=changed.find("\"prerelease\":true");changed.replace(p,17,"\"prerelease\":false");CHECK(select_release(changed,"test/launcher",false));
     unsigned rejected=0;for(auto invalid:{"{}","not json"})try{select_release(invalid,"test/launcher",true);}catch(...){++rejected;}CHECK(rejected==2);
     puts("PASS release versions, preview channel, drafts, URL/repository pinning, digest and malformed metadata");return 0;

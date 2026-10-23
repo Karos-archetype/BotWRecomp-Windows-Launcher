@@ -10,6 +10,8 @@ import subprocess
 import sys
 import time
 sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from install_dump import resolve_dumps
 
 SUPPORTED_RPX = 'ba58da5b95ce929e005d058ceb08b9b2788d1ab2bbc8a6c189bbadca0bb34d30'
 
@@ -42,7 +44,7 @@ def rsp_argument(value):
 
 def prepare(package, config, jobs=None):
     package = Path(package).resolve(); config = Path(config).resolve()
-    settings = read_settings(config); rpx = validate_dump(settings)
+    settings = read_settings(config)
     if not settings.get('user'): raise ValueError('Save-data folder is not configured.')
     user = Path(settings['user']).resolve(); user.mkdir(parents=True, exist_ok=True)
     support = package/'support'; manifest = json.loads((support/'build.json').read_text())
@@ -50,6 +52,21 @@ def prepare(package, config, jobs=None):
     status = user/'preparation-status.txt'
     def report(message):
         print(message, flush=True); atomic_text(status, message)
+    # Serialize imports as well as game-code compilation across launcher instances.
+    import msvcrt
+    import_lock = (user/'dump-import.lock').open('a+b')
+    if import_lock.tell() == 0: import_lock.write(b'0'); import_lock.flush()
+    import_lock.seek(0)
+    try:
+        try: msvcrt.locking(import_lock.fileno(), msvcrt.LK_NBLCK, 1)
+        except OSError: raise RuntimeError('Game preparation is already running in another launcher.')
+        resolved = resolve_dumps(settings, user, support, report)
+        rpx = validate_dump(resolved)
+        atomic_text(user/'prepared-dumps.ini', '\n'.join(f'{k}={v}' for k, v in {
+            'source_game': settings.get('game', ''), 'source_update': settings.get('update', ''),
+            'game': resolved['game'], 'update': resolved['update']}.items())+'\n')
+    finally:
+        import_lock.close()
     if executable.is_file() and (destination/'ready.json').is_file():
         ready = json.loads((destination/'ready.json').read_text())
         if ready.get('host_id') == manifest['host_id'] and ready.get('rpx') == SUPPORTED_RPX and ready.get('exe_sha256') == digest(executable):

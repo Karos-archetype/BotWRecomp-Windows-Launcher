@@ -104,18 +104,25 @@ std::filesystem::path prepared_runtime(){
     return std::filesystem::u8path(settings.user)/L"runtime"/id/L"BotWWindowsHeadless.exe";
 }
 void launch_saved(){
-    auto game_root=std::filesystem::u8path(settings.game),update_root=std::filesystem::u8path(settings.update);
-    if(!std::filesystem::exists(game_root/L"code/U-King.rpx"))throw std::runtime_error("Select the base game folder containing code/U-King.rpx.");
-    if(!settings.update.empty() && !std::filesystem::exists(update_root/L"code/U-King.rpx"))throw std::runtime_error("Select the update folder containing code/U-King.rpx.");
+    auto runtime_settings=settings;auto runtime_config=config;
     if(std::filesystem::exists(base/L"support/runtime-id.txt")){
-        auto effective=settings.update.empty()?game_root:update_root;
+        auto paths=launcher::read(std::filesystem::u8path(settings.user)/L"prepared-dumps.ini");
+        if(paths["source_game"]!=settings.game||paths["source_update"]!=settings.update)throw std::runtime_error("Game folders need preparation. Click Set up and Play.");
+        runtime_settings.game=paths["game"];runtime_settings.update=paths["update"];
+        runtime_config=std::filesystem::u8path(settings.user)/L"runtime-launch.ini";
+    }
+    auto game_root=std::filesystem::u8path(runtime_settings.game),update_root=std::filesystem::u8path(runtime_settings.update);
+    if(!std::filesystem::exists(game_root/L"code/U-King.rpx"))throw std::runtime_error("Select the base game folder containing code/U-King.rpx.");
+    if(!runtime_settings.update.empty() && !std::filesystem::exists(update_root/L"code/U-King.rpx"))throw std::runtime_error("Select the update folder containing code/U-King.rpx.");
+    if(std::filesystem::exists(base/L"support/runtime-id.txt")){
+        auto effective=runtime_settings.update.empty()?game_root:update_root;
         if(!std::filesystem::is_directory(game_root/L"content")||!std::filesystem::is_directory(effective/L"content"))throw std::runtime_error("Choose extracted dump folders containing code/ and content/.");
         if(launcher::updates::sha256(effective/L"code/U-King.rpx")!="ba58da5b95ce929e005d058ceb08b9b2788d1ab2bbc8a6c189bbadca0bb34d30")throw std::runtime_error("This preview requires your own Wii U USA v208 update. The selected executable is unsupported.");
     }
     if(settings.user.empty())throw std::runtime_error("The save-data folder is missing from windows-launch.ini.");
-    launcher::save(config,settings);auto exe=prepared_runtime();
+    launcher::save(config,settings);launcher::save(runtime_config,runtime_settings);auto exe=prepared_runtime();
     if(!std::filesystem::exists(exe))throw std::runtime_error("The native game executable was not found beside the launcher.");
-    std::wstring command=L"\""+exe.wstring()+L"\" --config \""+config.wstring()+L"\"";STARTUPINFOW start{sizeof(start)};PROCESS_INFORMATION process{};
+    std::wstring command=L"\""+exe.wstring()+L"\" --config \""+runtime_config.wstring()+L"\"";STARTUPINFOW start{sizeof(start)};PROCESS_INFORMATION process{};
     if(!CreateProcessW(exe.c_str(),command.data(),nullptr,nullptr,FALSE,CREATE_NO_WINDOW,nullptr,base.c_str(),&start,&process))throw std::runtime_error("Windows could not start the game (error "+std::to_string(GetLastError())+").");
     CloseHandle(process.hThread);game_process=process.hProcess;
     if(root){EnableWindow(control(PLAY),FALSE);notice(L"Game running. Your settings will apply on the next launch.");}
@@ -123,7 +130,7 @@ void launch_saved(){
 void play(){
     if(game_process||preparation_process)return;
     collect();launcher::save(config,settings);
-    if(std::filesystem::exists(prepared_runtime())){launch_saved();return;}
+    if(!std::filesystem::exists(base/L"support/runtime-id.txt") && std::filesystem::exists(prepared_runtime())){launch_saved();return;}
     auto python=base/L"support/python/python.exe",script=base/L"support/prepare.py";
     if(!std::filesystem::exists(python)||!std::filesystem::exists(script))throw std::runtime_error("Extract the complete portable ZIP, including its support folder.");
     auto user=std::filesystem::u8path(settings.user);std::filesystem::create_directories(user);
@@ -141,7 +148,7 @@ void play(){
     if(!AssignProcessToJobObject(preparation_job,process.hProcess)){TerminateProcess(process.hProcess,1);CloseHandle(process.hProcess);CloseHandle(process.hThread);CloseHandle(preparation_job);preparation_job=nullptr;throw std::runtime_error("Cannot manage the preparation worker.");}
     preparation_process=process.hProcess;ResumeThread(process.hThread);CloseHandle(process.hThread);
     EnableWindow(control(PLAY),FALSE);EnableWindow(control(SAVE),FALSE);EnableWindow(control(CHECK_RELEASE),FALSE);EnableWindow(control(APPLY_RELEASE),FALSE);
-    notice(L"First-time preparation started. Closing the launcher cancels it; progress is saved for next time.");
+    notice(L"Checking your dump and preparing install packages if needed. See Open logs for progress.");
 }
 void paint(){PAINTSTRUCT ps{};HDC dc=BeginPaint(root,&ps);RECT area{};GetClientRect(root,&area);FillRect(dc,&area,background);
     rect(dc,0,0,310,790,panel);rect(dc,28,52,40,3,gold);
@@ -215,8 +222,8 @@ void create_controls(){
     auto mute=widget(MUTE,L"BUTTON",L"Mute audio",688,382,210,28,BS_AUTOCHECKBOX);SendMessageW(mute,BM_SETCHECK,settings.mute?BST_CHECKED:BST_UNCHECKED,0);
     auto warm=widget(PREWARM,L"BUTTON",L"Prepare cached effects · slower startup",350,414,645,28,BS_AUTOCHECKBOX);SendMessageW(warm,BM_SETCHECK,settings.prewarm?BST_CHECKED:BST_UNCHECKED,0);
     auto sync=widget(VSYNC,L"BUTTON",L"VSync · monitor refresh limit",350,382,315,28,BS_AUTOCHECKBOX);SendMessageW(sync,BM_SETCHECK,settings.vsync?BST_CHECKED:BST_UNCHECKED,0);update_limits();
-    label(L"BASE GAME FOLDER",352,497,500);widget(GAME,L"EDIT",wide(settings.game).c_str(),350,522,548,29,ES_AUTOHSCROLL|WS_BORDER);widget(BROWSE_GAME,L"BUTTON",L"Browse",912,520,86,32,BS_OWNERDRAW);
-    label(L"UPDATE FOLDER",352,560,500);widget(UPDATE,L"EDIT",wide(settings.update).c_str(),350,585,548,29,ES_AUTOHSCROLL|WS_BORDER);widget(BROWSE_UPDATE,L"BUTTON",L"Browse",912,583,86,32,BS_OWNERDRAW);
+    label(L"BASE GAME FOLDER (DUMP / INSTALL PACKAGE)",352,497,600);widget(GAME,L"EDIT",wide(settings.game).c_str(),350,522,548,29,ES_AUTOHSCROLL|WS_BORDER);widget(BROWSE_GAME,L"BUTTON",L"Browse",912,520,86,32,BS_OWNERDRAW);
+    label(L"USA v208 UPDATE (DUMP / INSTALL PACKAGE)",352,560,600);widget(UPDATE,L"EDIT",wide(settings.update).c_str(),350,585,548,29,ES_AUTOHSCROLL|WS_BORDER);widget(BROWSE_UPDATE,L"BUTTON",L"Browse",912,583,86,32,BS_OWNERDRAW);
     widget(PLAY,L"BUTTON",std::filesystem::exists(prepared_runtime())?L"PLAY GAME":L"SET UP AND PLAY",350,685,224,50,BS_OWNERDRAW);widget(SAVE,L"BUTTON",L"Save settings",592,685,192,50,BS_OWNERDRAW);widget(LOGS,L"BUTTON",L"Open logs",802,685,196,50,BS_OWNERDRAW);
     status=widget(0,L"STATIC",settings.game.empty()?L"First run: choose your dumped game + USA v208 update, then click Set up and Play.":L"Ready to play.",352,746,650,24);SendMessageW(status,WM_SETFONT,reinterpret_cast<WPARAM>(small),TRUE);layout_items.back().small_font=true;
 }
@@ -260,7 +267,12 @@ int WINAPI wWinMain(HINSTANCE instance,HINSTANCE,PWSTR,int show){try{
     dpi=GetDpiForSystem()/96.f;INITCOMMONCONTROLSEX common{sizeof(common),ICC_STANDARD_CLASSES|ICC_BAR_CLASSES};InitCommonControlsEx(&common);
     wchar_t module[32768];GetModuleFileNameW(nullptr,module,32768);base=std::filesystem::path(module).parent_path();config=base/L"windows-launch.ini";settings=launcher::load(config);if(settings.user.empty()){PWSTR folder{};if(SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData,0,nullptr,&folder))){settings.user=utf8((std::filesystem::path(folder)/L"BotWRecomp"/L"user").wstring());CoTaskMemFree(folder);}}detect_gpu();
     int argc{};auto arguments=CommandLineToArgvW(GetCommandLineW(),&argc);if(arguments){direct_play=argc==2&&std::wstring_view(arguments[1])==L"--play";LocalFree(arguments);}
-    if(direct_play&&!settings.game.empty()&&std::filesystem::exists(prepared_runtime())){launch_saved();CloseHandle(game_process);game_process=nullptr;CoUninitialize();return 0;}
+    if(direct_play&&!settings.game.empty()&&std::filesystem::exists(prepared_runtime())){
+        auto paths=launcher::read(std::filesystem::u8path(settings.user)/L"prepared-dumps.ini");
+        if(!std::filesystem::exists(base/L"support/runtime-id.txt")||(paths["source_game"]==settings.game&&paths["source_update"]==settings.update)){
+            launch_saved();CloseHandle(game_process);game_process=nullptr;CoUninitialize();return 0;
+        }
+    }
     WNDCLASSEXW wc{sizeof(wc)};wc.hInstance=instance;wc.lpfnWndProc=proc;wc.lpszClassName=L"BotWNativeLauncher";wc.hCursor=LoadCursorW(nullptr,IDC_ARROW);wc.hIcon=LoadIconW(nullptr,IDI_APPLICATION);RegisterClassExW(&wc);
     RECT size{0,0,px(1040),px(790)};AdjustWindowRectEx(&size,windowed_style,FALSE,0);
     root=CreateWindowExW(0,wc.lpszClassName,L"Breath of the Wild · Native Launcher",windowed_style,CW_USEDEFAULT,CW_USEDEFAULT,size.right-size.left,size.bottom-size.top,nullptr,nullptr,instance,nullptr);

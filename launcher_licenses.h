@@ -7,6 +7,8 @@ Windows launcher additions: Karos-archetype.
 AI-assisted implementation, debugging and documentation: OpenAI Codex,
 under the maintainer's direction.
 Vulkan GPU layer: Cemu contributors (MPL-2.0). Temporal upscaling: AMD FSR.
+Install-package extraction: CDecrypt, crediar and VitaSmith (GPL-3.0-or-later).
+The separate CDecrypt tool, its source and license are included in the package.
 The portable package includes full dependency notices in licenses/ and
 corresponding project source in Source.zip. No game executable is distributed;
 the game component is generated locally from the user's supported dump.
